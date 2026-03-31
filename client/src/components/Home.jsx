@@ -130,7 +130,7 @@ export default function Home() {
         </div>
         <p className="subtitle">
           <Sparkles size={14} style={{ display: 'inline', verticalAlign: '-2px' }} />
-          {' '}RETRO JIGSAW BATTLE{' '}
+          {' '}Good people playing good games{' '}
           <Sparkles size={14} style={{ display: 'inline', verticalAlign: '-2px' }} />
         </p>
       </div>

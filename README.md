@@ -1,4 +1,4 @@
-# 🧩 PUZZLE2D — Retro Jigsaw Battle
+# 🧩 PUZZLE2D — Good people playing good games
 
 A multiplayer browser-based jigsaw puzzle game with a retro arcade aesthetic. Upload 3 images, share a link, and race your friends to solve puzzles across 3 rounds of increasing difficulty.
 
