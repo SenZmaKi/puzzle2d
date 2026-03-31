@@ -901,6 +901,90 @@ body {
   color: var(--text-dim);
 }
 
+/* Timelapse replay overlay */
+.timelapse-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  padding-bottom: 2rem;
+  background:
+    linear-gradient(180deg, rgba(26, 14, 20, 0.3) 0%, transparent 30%, transparent 70%, rgba(26, 14, 20, 0.4) 100%);
+  animation: timelapseIn 0.4s ease-out;
+  /* VHS-style vignette */
+  box-shadow: inset 0 0 120px rgba(0, 0, 0, 0.4);
+}
+
+@keyframes timelapseIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.timelapse-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(220, 20, 60, 0.85);
+  border: 2px solid var(--red-light);
+  color: white;
+  font-family: var(--font-display);
+  font-size: 0.6rem;
+  letter-spacing: 0.25em;
+  padding: 0.5rem 1.2rem;
+  border-radius: 4px;
+  box-shadow:
+    0 0 20px rgba(220, 20, 60, 0.6),
+    0 0 60px rgba(220, 20, 60, 0.2);
+  animation: timelapsePulse 0.8s ease-in-out infinite alternate;
+}
+
+.timelapse-icon {
+  animation: timelapseSpin 0.6s linear infinite;
+}
+
+@keyframes timelapseSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(-360deg); }
+}
+
+@keyframes timelapsePulse {
+  from {
+    box-shadow: 0 0 20px rgba(220, 20, 60, 0.6), 0 0 60px rgba(220, 20, 60, 0.2);
+    text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+  }
+  to {
+    box-shadow: 0 0 30px rgba(220, 20, 60, 0.8), 0 0 80px rgba(220, 20, 60, 0.3);
+    text-shadow: 0 0 15px rgba(255, 255, 255, 0.8);
+  }
+}
+
+.timelapse-progress {
+  margin-top: 0.75rem;
+  width: 180px;
+  height: 4px;
+  background: rgba(80, 34, 56, 0.6);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.timelapse-bar {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--red-primary), var(--gold));
+  border-radius: 2px;
+  animation: timelapseProgress 5s linear forwards;
+  box-shadow: 0 0 8px rgba(255, 215, 0, 0.5);
+}
+
+@keyframes timelapseProgress {
+  from { width: 0%; }
+  to { width: 100%; }
+}
+
 /* ============ LOADING ============ */
 .loading-screen {
   height: 100%;
@@ -1215,11 +1299,163 @@ body {
 }
 
 /* ============ MUTE BUTTON ============ */
-.mute-btn {
+/* ============ VOLUME CONTROL ============ */
+.volume-control {
   position: fixed;
   bottom: 1rem;
   left: 1rem;
   z-index: 9000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.volume-panel {
+  display: flex;
+  gap: 0;
+  padding: 0.6rem 0.5rem;
+  margin-bottom: 0.4rem;
+  background: var(--bg-card);
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.6), 0 0 12px rgba(220, 20, 60, 0.15);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(8px) scale(0.9);
+  transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  pointer-events: none;
+}
+
+.volume-panel.visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+.vol-channel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0 0.35rem;
+}
+
+.vol-channel-label {
+  font-family: var(--font-display);
+  font-size: 0.35rem;
+  color: var(--text-dim);
+  letter-spacing: 0.2em;
+  white-space: nowrap;
+}
+
+.vol-divider {
+  width: 1px;
+  align-self: stretch;
+  margin: 0 0.2rem;
+  background: var(--border);
+}
+
+.vol-channel-btn {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-primary);
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+
+.vol-channel-btn:hover {
+  border-color: var(--red-primary);
+  color: var(--red-light);
+  background: rgba(220, 20, 60, 0.1);
+}
+
+.volume-pct {
+  font-family: var(--font-display);
+  font-size: 0.45rem;
+  color: var(--gold);
+  letter-spacing: 0.1em;
+  text-shadow: 0 0 6px rgba(255, 215, 0, 0.3);
+  min-width: 30px;
+  text-align: center;
+}
+
+.volume-track-wrapper {
+  width: 28px;
+  height: 90px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.volume-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 90px;
+  height: 6px;
+  background: transparent;
+  transform: rotate(-90deg);
+  transform-origin: center center;
+  outline: none;
+  cursor: pointer;
+}
+
+.volume-slider::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--red-dark), var(--red-primary) 50%, var(--gold));
+  border: 1px solid var(--border);
+}
+
+.volume-slider::-moz-range-track {
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--red-dark), var(--red-primary) 50%, var(--gold));
+  border: 1px solid var(--border);
+}
+
+.volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--text-bright);
+  border: 2px solid var(--red-primary);
+  margin-top: -4px;
+  box-shadow: 0 0 8px rgba(220, 20, 60, 0.5), 0 2px 4px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  transition: box-shadow 0.2s, transform 0.15s;
+}
+
+.volume-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--text-bright);
+  border: 2px solid var(--red-primary);
+  box-shadow: 0 0 8px rgba(220, 20, 60, 0.5), 0 2px 4px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  transition: box-shadow 0.2s, transform 0.15s;
+}
+
+.volume-slider::-webkit-slider-thumb:hover {
+  box-shadow: 0 0 14px rgba(220, 20, 60, 0.8), 0 2px 6px rgba(0, 0, 0, 0.5);
+  transform: scale(1.15);
+}
+
+.volume-slider::-moz-range-thumb:hover {
+  box-shadow: 0 0 14px rgba(220, 20, 60, 0.8), 0 2px 6px rgba(0, 0, 0, 0.5);
+  transform: scale(1.15);
+}
+
+.mute-btn {
   background: var(--bg-card);
   border: 2px solid var(--border);
   border-radius: 50%;
@@ -1231,11 +1467,11 @@ body {
   justify-content: center;
   cursor: pointer;
   color: var(--text-primary);
-  transition: border-color 0.3s, box-shadow 0.3s, transform 0.2s;
+  transition: border-color 0.3s, box-shadow 0.3s, transform 0.2s, opacity 0.3s;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
 }
 
-.mute-btn:hover {
+.volume-control:hover .mute-btn {
   border-color: var(--red-primary);
   box-shadow: 0 0 15px rgba(220, 20, 60, 0.3);
   transform: scale(1.1);

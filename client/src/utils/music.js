@@ -2,8 +2,9 @@
 let currentAudio = null;
 let trackList = null;
 let isPlaying = false;
-let isMuted = (() => { try { return localStorage.getItem('puzzle2d_muted') === 'true'; } catch { return false; } })();
-let volume = 0.05;
+let isMuted = (() => { try { return localStorage.getItem('puzzle2d_music_muted') === 'true'; } catch { return false; } })();
+let volume = (() => { try { const v = localStorage.getItem('puzzle2d_music_vol'); return v !== null ? parseFloat(v) : 0.5; } catch { return 0.5; } })();
+const BASE_BGM_VOLUME = 0.1;
 
 async function fetchTrackList() {
   if (trackList) return trackList;
@@ -40,7 +41,7 @@ function playTrack(track, tracks) {
   }
 
   currentAudio = new Audio(`/sounds/${track}`);
-  currentAudio.volume = isMuted ? 0 : volume;
+  currentAudio.volume = isMuted ? 0 : volume * BASE_BGM_VOLUME;
 
   currentAudio.addEventListener('ended', () => {
     if (!isPlaying) return;
@@ -64,18 +65,31 @@ export function stopBGM() {
 
 export function toggleMute() {
   isMuted = !isMuted;
-  localStorage.setItem('puzzle2d_muted', isMuted);
+  localStorage.setItem('puzzle2d_music_muted', isMuted);
   if (currentAudio) {
-    currentAudio.volume = isMuted ? 0 : volume;
+    currentAudio.volume = isMuted ? 0 : volume * BASE_BGM_VOLUME;
   }
   return isMuted;
+}
+
+export function setMusicMuted(muted) {
+  isMuted = muted;
+  localStorage.setItem('puzzle2d_music_muted', isMuted);
+  if (currentAudio) {
+    currentAudio.volume = isMuted ? 0 : volume * BASE_BGM_VOLUME;
+  }
 }
 
 export function getMuted() {
   return isMuted;
 }
 
+export function getVolume() {
+  return volume;
+}
+
 export function setBGMVolume(vol) {
   volume = Math.max(0, Math.min(1, vol));
-  if (currentAudio && !isMuted) currentAudio.volume = volume;
+  localStorage.setItem('puzzle2d_music_vol', volume);
+  if (currentAudio && !isMuted) currentAudio.volume = volume * BASE_BGM_VOLUME;
 }

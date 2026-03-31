@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { PuzzleEngine } from '../engine/PuzzleEngine';
-import { playConnectSound, playSnapSound } from '../utils/sounds';
-import { Timer, Puzzle, X, Users, Layers } from 'lucide-react';
+import { playConnectSound, playSnapSound, playTimelapseSound, stopTimelapseSound } from '../utils/sounds';
+import { Timer, Puzzle, X, Users, Layers, Rewind } from 'lucide-react';
 
 export default function Game({
   gameData,
@@ -19,6 +19,7 @@ export default function Game({
   const [totalPieces, setTotalPieces] = useState(0);
   const [timer, setTimer] = useState(0);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [isReplaying, setIsReplaying] = useState(false);
   const timerRef = useRef(null);
   const startTimeRef = useRef(null);
 
@@ -69,8 +70,18 @@ export default function Game({
             const elapsed = Date.now() - startTimeRef.current;
             if (timerRef.current) clearInterval(timerRef.current);
             setTimer(elapsed);
-            // Small delay for the final snap to feel satisfying
-            setTimeout(() => onRoundComplete(elapsed), 600);
+            // Run timelapse replay before showing round complete
+            setTimeout(async () => {
+              setIsReplaying(true);
+              playTimelapseSound();
+              try {
+                await engine.replayTimelapse(5000);
+              } finally {
+                stopTimelapseSound();
+                setIsReplaying(false);
+              }
+              setTimeout(() => onRoundComplete(elapsed), 400);
+            }, 600);
           },
         });
 
@@ -200,6 +211,17 @@ export default function Game({
           <div className="loading-overlay">
             <div className="loading-spinner" />
             <p>Loading puzzle...</p>
+          </div>
+        )}
+        {isReplaying && (
+          <div className="timelapse-overlay">
+            <div className="timelapse-badge">
+              <Rewind size={14} className="timelapse-icon" />
+              <span>TIMELAPSE</span>
+            </div>
+            <div className="timelapse-progress">
+              <div className="timelapse-bar" />
+            </div>
           </div>
         )}
       </div>

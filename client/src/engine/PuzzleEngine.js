@@ -104,6 +104,10 @@ export class PuzzleEngine {
     this.completed = false;
     this.dpr = window.devicePixelRatio || 1;
 
+    // Timelapse replay data
+    this.initialPositions = [];
+    this.snapshots = [];
+
     this._boundMouseDown = this._onMouseDown.bind(this);
     this._boundMouseMove = this._onMouseMove.bind(this);
     this._boundMouseUp = this._onMouseUp.bind(this);
@@ -191,6 +195,10 @@ export class PuzzleEngine {
 
     // Scatter pieces randomly
     this._scatterPieces(rng);
+
+    // Capture initial scatter positions for timelapse replay
+    this.initialPositions = this.pieces.map(p => ({ id: p.id, x: p.x, y: p.y }));
+    this.snapshots = [];
 
     // Input listeners
     this.canvas.addEventListener('mousedown', this._boundMouseDown);
@@ -393,8 +401,11 @@ export class PuzzleEngine {
             }
           }
           snapped = true;
+          // Remove group — placed pieces are fully resolved
+          this.groups.delete(piece.groupId);
+          this._captureSnapshot();
           log.debug('Piece snapped to board', { placed: this.placedCount, total: this.totalPieces });
-          this.onPiecePlaced(this.placedCount, this.totalPieces);
+          this.onPiecePlaced(this._getProgress(), this.totalPieces);
           this.onPieceConnected();
           break;
         }
@@ -451,7 +462,9 @@ export class PuzzleEngine {
             Math.abs(actualDy - expectedDy) < snapDist) {
           this._mergeGroups(piece, p, neighbor);
           merged = true;
+          this._captureSnapshot();
           this.onPieceConnected();
+          this.onPiecePlaced(this._getProgress(), this.totalPieces);
           // After merge, check again for more connections
           this._checkConnections(piece);
           return;
@@ -599,6 +612,134 @@ export class PuzzleEngine {
       };
       requestAnimationFrame(animate);
     });
+  }
+
+  _getProgress() {
+    return this.totalPieces - this.groups.size;
+  }
+
+  _captureSnapshot() {
+    this.snapshots.push(
+      this.pieces.map(p => ({ id: p.id, x: p.x, y: p.y, placed: p.placed }))
+    );
+  }
+
+  _disableInput() {
+    this.canvas.removeEventListener('mousedown', this._boundMouseDown);
+    window.removeEventListener('mousemove', this._boundMouseMove);
+    window.removeEventListener('mouseup', this._boundMouseUp);
+    this.canvas.removeEventListener('touchstart', this._boundTouchStart);
+    window.removeEventListener('touchmove', this._boundTouchMove);
+    window.removeEventListener('touchend', this._boundTouchEnd);
+    this.canvas.style.cursor = 'default';
+  }
+
+  _enableInput() {
+    this.canvas.addEventListener('mousedown', this._boundMouseDown);
+    window.addEventListener('mousemove', this._boundMouseMove);
+    window.addEventListener('mouseup', this._boundMouseUp);
+    this.canvas.addEventListener('touchstart', this._boundTouchStart, { passive: false });
+    window.addEventListener('touchmove', this._boundTouchMove, { passive: false });
+    window.addEventListener('touchend', this._boundTouchEnd);
+  }
+
+  // Replay the full puzzle assembly as a timelapse
+  replayTimelapse(duration = 5000) {
+    return new Promise((resolve) => {
+      this._disableInput();
+
+      const snapCount = this.snapshots.length;
+      if (snapCount === 0) { resolve(); return; }
+
+      // Phase 1: Scatter back to initial positions (600ms)
+      const scatterDuration = 600;
+      const currentPositions = this.pieces.map(p => ({ x: p.x, y: p.y }));
+      const initialMap = new Map(this.initialPositions.map(ip => [ip.id, ip]));
+
+      // Reset placed state for visual
+      this.pieces.forEach(p => { p.placed = false; });
+
+      const t0 = performance.now();
+      const animateScatter = (now) => {
+        const t = Math.min((now - t0) / scatterDuration, 1);
+        const ease = 1 - Math.pow(1 - t, 3);
+
+        this.pieces.forEach((p, i) => {
+          const init = initialMap.get(p.id);
+          p.x = currentPositions[i].x + (init.x - currentPositions[i].x) * ease;
+          p.y = currentPositions[i].y + (init.y - currentPositions[i].y) * ease;
+        });
+        this.render();
+
+        if (t < 1) {
+          requestAnimationFrame(animateScatter);
+        } else {
+          // Phase 2: Replay snapshots
+          this._animateSnapshots(duration, resolve);
+        }
+      };
+      requestAnimationFrame(animateScatter);
+    });
+  }
+
+  _animateSnapshots(totalDuration, resolve) {
+    const snapCount = this.snapshots.length;
+    // Time per transition between snapshots
+    const transitionTime = totalDuration / snapCount;
+    // Each transition: 70% animating, 30% hold
+    const animFraction = 0.7;
+
+    let currentSnap = 0;
+    const initialMap = new Map(this.initialPositions.map(ip => [ip.id, ip]));
+
+    const runTransition = () => {
+      if (currentSnap >= snapCount) {
+        // Done — restore final state
+        this.pieces.forEach(p => {
+          p.x = p.targetX;
+          p.y = p.targetY;
+          p.placed = true;
+        });
+        this.render();
+        resolve();
+        return;
+      }
+
+      const targetSnap = this.snapshots[currentSnap];
+      const targetMap = new Map(targetSnap.map(s => [s.id, s]));
+
+      // Capture where pieces are right now
+      const from = this.pieces.map(p => ({ x: p.x, y: p.y }));
+      const animDur = transitionTime * animFraction;
+      const holdDur = transitionTime * (1 - animFraction);
+      const t0 = performance.now();
+
+      const animateStep = (now) => {
+        const elapsed = now - t0;
+        const t = Math.min(elapsed / animDur, 1);
+        // Snappy ease-out
+        const ease = 1 - Math.pow(1 - t, 4);
+
+        this.pieces.forEach((p, i) => {
+          const target = targetMap.get(p.id);
+          p.x = from[i].x + (target.x - from[i].x) * ease;
+          p.y = from[i].y + (target.y - from[i].y) * ease;
+          p.placed = target.placed;
+        });
+        this.render();
+
+        if (t < 1) {
+          requestAnimationFrame(animateStep);
+        } else {
+          currentSnap++;
+          // Brief hold before next transition
+          setTimeout(runTransition, holdDur);
+        }
+      };
+      requestAnimationFrame(animateStep);
+    };
+
+    runTransition();
   }
 
   destroy() {
