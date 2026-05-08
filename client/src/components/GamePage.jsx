@@ -21,6 +21,8 @@ export default function GamePage() {
   const [players, setPlayers] = useState([]);
   const [opponents, setOpponents] = useState({});
   const [error, setError] = useState('');
+  const [incomingNuke, setIncomingNuke] = useState(null);
+  const [nukeResult, setNukeResult] = useState(null);
 
   // Load game data
   useEffect(() => {
@@ -91,6 +93,16 @@ export default function GamePage() {
       }));
     });
 
+    socket.on('nuke_incoming', ({ fromPlayerId, fromPlayerName, sectionRow, sectionCol }) => {
+      log.info('Incoming nuke!', { fromPlayerId, fromPlayerName, sectionRow, sectionCol });
+      setIncomingNuke({ fromPlayerId, fromPlayerName, sectionRow, sectionCol });
+    });
+
+    socket.on('nuke_result', ({ hit, piecesDestroyed }) => {
+      log.info('Nuke result received', { hit, piecesDestroyed });
+      setNukeResult({ hit, piecesDestroyed });
+    });
+
     socket.on('player_joined', ({ playerName }) => {
       // Notification handled by players_update
     });
@@ -105,6 +117,8 @@ export default function GamePage() {
       socket.off('game_started');
       socket.off('opponent_progress');
       socket.off('opponent_round_complete');
+      socket.off('nuke_incoming');
+      socket.off('nuke_result');
       socket.off('player_joined');
       socket.off('player_left');
       socket.disconnect();
@@ -186,6 +200,32 @@ export default function GamePage() {
     });
   };
 
+  const handleNukeLaunch = (targetPlayerId, sectionRow, sectionCol) => {
+    log.info('Launching nuke', { targetPlayerId, sectionRow, sectionCol });
+    socket.emit('nuke_launch', {
+      gameId,
+      fromPlayerId: playerInfo.playerId,
+      fromPlayerName: playerInfo.playerName,
+      targetPlayerId,
+      sectionRow,
+      sectionCol,
+    });
+  };
+
+  const handleNukeHandled = ({ fromPlayerId, hit, piecesDestroyed }) => {
+    socket.emit('nuke_result', {
+      gameId,
+      fromPlayerId,
+      hit,
+      piecesDestroyed,
+    });
+    setIncomingNuke(null);
+  };
+
+  const handleNukeResultSeen = () => {
+    setNukeResult(null);
+  };
+
   const handleCancel = () => {
     log.info('Player cancelling game', { gameId });
     socket.emit('game_cancelled', {
@@ -243,6 +283,11 @@ export default function GamePage() {
         onPiecePlaced={handlePiecePlaced}
         onRoundComplete={handleRoundComplete}
         onCancel={handleCancel}
+        onNukeLaunch={handleNukeLaunch}
+        incomingNuke={incomingNuke}
+        onNukeHandled={handleNukeHandled}
+        nukeResult={nukeResult}
+        onNukeResultSeen={handleNukeResultSeen}
       />
     );
   }

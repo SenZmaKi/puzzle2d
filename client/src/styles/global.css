@@ -1800,3 +1800,411 @@ body {
   display: flex;
   align-items: center;
 }
+
+/* ============ TACTICAL NUKE ============ */
+.nuke-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: linear-gradient(180deg, #2a1a00, #1a0e00);
+  border: 2px solid #554400;
+  color: #886600;
+  font-family: var(--font-display);
+  font-size: 0.5rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 4px;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.3s;
+  overflow: hidden;
+  min-width: 80px;
+}
+
+.nuke-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.nuke-btn.ready {
+  background: linear-gradient(180deg, #3a1500, #2a0a00);
+  border-color: #ff6600;
+  color: #ff8800;
+  animation: nukeReady 1.2s ease-in-out infinite;
+  box-shadow: 0 0 15px rgba(255, 100, 0, 0.4);
+}
+
+.nuke-btn.ready:hover {
+  box-shadow: 0 0 25px rgba(255, 100, 0, 0.6);
+  transform: translateY(-1px);
+}
+
+.nuke-btn.targeting {
+  border-color: #ff4400;
+  box-shadow: 0 0 20px rgba(255, 68, 0, 0.5);
+}
+
+@keyframes nukeReady {
+  0%, 100% { box-shadow: 0 0 15px rgba(255, 100, 0, 0.4); }
+  50% { box-shadow: 0 0 30px rgba(255, 100, 0, 0.7); }
+}
+
+.nuke-icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.nuke-label {
+  font-size: 0.5rem;
+  letter-spacing: 0.1em;
+}
+
+.nuke-charge-bar {
+  position: absolute;
+  bottom: 2px;
+  left: 4px;
+  right: 4px;
+  height: 3px;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.nuke-charge-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #884400, #ff8800);
+  border-radius: 2px;
+  transition: width 0.15s linear;
+  box-shadow: 0 0 4px rgba(255, 136, 0, 0.5);
+}
+
+/* Nuke select mode for opponent sidebar */
+.opponents-sidebar.nuke-select-mode {
+  border-color: #ff6600;
+  box-shadow: 0 0 25px rgba(255, 100, 0, 0.4);
+  opacity: 1;
+}
+
+.nuke-select-header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--font-display);
+  font-size: 0.45rem;
+  color: #ff6600;
+  letter-spacing: 0.2em;
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid rgba(255, 100, 0, 0.3);
+  animation: nukeFlicker 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes nukeFlicker {
+  from { opacity: 0.7; }
+  to { opacity: 1; }
+}
+
+.opponent-card.nuke-targetable {
+  cursor: crosshair;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 0.5rem;
+  margin: 0 -0.1rem;
+  transition: all 0.2s;
+}
+
+.opponent-card.nuke-targetable:hover {
+  border-color: #ff6600;
+  background: rgba(255, 100, 0, 0.1);
+  box-shadow: 0 0 10px rgba(255, 100, 0, 0.2);
+}
+
+.nuke-target-label {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-family: var(--font-display);
+  font-size: 0.4rem;
+  color: #ff6600;
+  margin-top: 0.3rem;
+  letter-spacing: 0.15em;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.opponent-card.nuke-targetable:hover .nuke-target-label {
+  opacity: 1;
+}
+
+.nuke-cancel-btn {
+  width: 100%;
+  margin-top: 0.5rem;
+  background: rgba(100, 40, 40, 0.3);
+  border: 1px solid #664444;
+  border-radius: 4px;
+  color: var(--text-dim);
+  font-family: var(--font-display);
+  font-size: 0.4rem;
+  padding: 0.4rem;
+  cursor: pointer;
+  letter-spacing: 0.1em;
+  transition: all 0.2s;
+}
+
+.nuke-cancel-btn:hover {
+  border-color: var(--red-light);
+  color: var(--red-light);
+  background: rgba(220, 20, 60, 0.1);
+}
+
+/* Nuke targeting grid on board */
+.nuke-target-overlay-wrapper {
+  position: absolute;
+  inset: 0;
+  z-index: 15;
+  pointer-events: none;
+}
+
+.nuke-target-title {
+  position: absolute;
+  top: 0.6rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-display);
+  font-size: 0.6rem;
+  color: #ff6600;
+  letter-spacing: 0.15em;
+  text-shadow: 0 0 15px rgba(255, 100, 0, 0.6);
+  background: rgba(26, 14, 20, 0.85);
+  padding: 0.4rem 1rem;
+  border: 1px solid rgba(255, 100, 0, 0.5);
+  border-radius: 4px;
+  z-index: 16;
+  pointer-events: none;
+  animation: nukeFlicker 0.8s ease-in-out infinite alternate;
+}
+
+.nuke-target-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  border: 2px solid rgba(255, 100, 50, 0.7);
+  box-shadow: 0 0 30px rgba(255, 100, 50, 0.3), inset 0 0 30px rgba(255, 100, 50, 0.05);
+  pointer-events: auto;
+  z-index: 15;
+  animation: targetGridIn 0.3s ease-out;
+}
+
+@keyframes targetGridIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.nuke-target-cell {
+  border: 1px solid rgba(255, 100, 50, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: crosshair;
+  transition: background 0.15s, box-shadow 0.15s;
+  background: rgba(255, 50, 20, 0.03);
+}
+
+.nuke-target-cell:hover {
+  background: rgba(255, 50, 20, 0.25);
+  box-shadow: inset 0 0 30px rgba(255, 100, 50, 0.2);
+}
+
+.nuke-cell-crosshair {
+  color: rgba(255, 100, 50, 0.25);
+  transition: color 0.15s, transform 0.15s;
+  pointer-events: none;
+}
+
+.nuke-target-cell:hover .nuke-cell-crosshair {
+  color: rgba(255, 100, 50, 0.9);
+  transform: scale(1.2);
+}
+
+/* Incoming nuke warning overlay */
+.nuke-warning-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 25;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: rgba(255, 0, 0, 0.12);
+  animation: nukeWarningFlash 0.4s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+@keyframes nukeWarningFlash {
+  from { background: rgba(255, 0, 0, 0.08); }
+  to { background: rgba(255, 0, 0, 0.2); }
+}
+
+.nuke-warning-icon {
+  font-size: 4rem;
+  animation: nukeWarnSpin 1s linear infinite;
+  filter: drop-shadow(0 0 20px rgba(255, 60, 0, 0.8));
+}
+
+@keyframes nukeWarnSpin {
+  0% { transform: rotate(0deg) scale(1); }
+  25% { transform: rotate(90deg) scale(1.1); }
+  50% { transform: rotate(180deg) scale(1); }
+  75% { transform: rotate(270deg) scale(1.1); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+
+.nuke-warning-text {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  color: #ff4444;
+  text-shadow:
+    0 0 20px rgba(255, 0, 0, 0.8),
+    0 0 40px rgba(255, 0, 0, 0.4),
+    0 0 80px rgba(255, 0, 0, 0.2);
+  animation: nukeWarnPulse 0.3s ease-in-out infinite alternate;
+}
+
+@keyframes nukeWarnPulse {
+  from { transform: scale(1); opacity: 0.9; }
+  to { transform: scale(1.05); opacity: 1; }
+}
+
+.nuke-warning-from {
+  font-family: var(--font-display);
+  font-size: 0.55rem;
+  color: var(--text-dim);
+  letter-spacing: 0.2em;
+}
+
+/* Nuke launched toast */
+.nuke-launched-toast {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  color: #ff8800;
+  text-shadow: 0 0 15px rgba(255, 100, 0, 0.8);
+  background: rgba(26, 14, 20, 0.9);
+  padding: 0.8rem 1.5rem;
+  border: 2px solid #ff6600;
+  border-radius: 6px;
+  box-shadow: 0 0 30px rgba(255, 100, 0, 0.4);
+  animation: nukeToastIn 0.3s ease-out;
+  letter-spacing: 0.15em;
+  pointer-events: none;
+}
+
+.nuke-launched-icon {
+  font-size: 1.3rem;
+}
+
+@keyframes nukeToastIn {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+/* Nuke result toast (hit / miss) */
+.nuke-result-toast {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  font-family: var(--font-display);
+  background: rgba(26, 14, 20, 0.92);
+  padding: 0.8rem 1.5rem;
+  border-radius: 6px;
+  animation: nukeToastIn 0.3s ease-out;
+  pointer-events: none;
+  letter-spacing: 0.1em;
+}
+
+.nuke-result-toast.hit {
+  border: 2px solid #00cc66;
+  box-shadow: 0 0 30px rgba(0, 204, 102, 0.4);
+}
+
+.nuke-result-toast.miss {
+  border: 2px solid #666;
+  box-shadow: 0 0 15px rgba(100, 100, 100, 0.3);
+}
+
+.nuke-result-icon {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.nuke-result-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.nuke-result-title {
+  font-size: 0.7rem;
+}
+
+.hit .nuke-result-title {
+  color: #00ff88;
+  text-shadow: 0 0 12px rgba(0, 255, 136, 0.5);
+}
+
+.miss .nuke-result-title {
+  color: #999;
+}
+
+.nuke-result-detail {
+  font-size: 0.45rem;
+  letter-spacing: 0.05em;
+}
+
+.hit .nuke-result-detail {
+  color: #88ddaa;
+}
+
+.miss .nuke-result-detail {
+  color: #777;
+}
+
+/* Mobile nuke adjustments */
+@media (max-width: 640px) {
+  .nuke-btn {
+    min-width: 60px;
+    padding: 0.3rem 0.5rem;
+    font-size: 0.4rem;
+  }
+
+  .nuke-icon {
+    font-size: 0.8rem;
+  }
+
+  .nuke-warning-text {
+    font-size: 1rem;
+  }
+
+  .nuke-warning-icon {
+    font-size: 2.5rem;
+  }
+
+  .nuke-target-title {
+    font-size: 0.45rem;
+  }
+}

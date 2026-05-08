@@ -65,6 +65,28 @@ export function setupSocket(io) {
       });
     });
 
+    socket.on('nuke_launch', ({ gameId, fromPlayerId, fromPlayerName, targetPlayerId, sectionRow, sectionCol }) => {
+      log.info('Nuke launched', { gameId, fromPlayerName, targetPlayerId, sectionRow, sectionCol });
+
+      for (const [socketId, data] of activeSockets) {
+        if (data.playerId === targetPlayerId && data.gameId === gameId) {
+          io.to(socketId).emit('nuke_incoming', { fromPlayerId, fromPlayerName, sectionRow, sectionCol });
+          break;
+        }
+      }
+    });
+
+    socket.on('nuke_result', ({ gameId, fromPlayerId, hit, piecesDestroyed }) => {
+      log.info('Nuke result', { gameId, fromPlayerId, hit, piecesDestroyed });
+
+      for (const [socketId, data] of activeSockets) {
+        if (data.playerId === fromPlayerId && data.gameId === gameId) {
+          io.to(socketId).emit('nuke_result', { hit, piecesDestroyed });
+          break;
+        }
+      }
+    });
+
     socket.on('game_cancelled', ({ gameId, playerId, playerName }) => {
       log.info('Game cancelled by player', { gameId, playerName });
       socket.to(gameId).emit('player_cancelled', { playerId, playerName });

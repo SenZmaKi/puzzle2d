@@ -220,3 +220,165 @@ export function stopTimelapseSound() {
     timelapseNodes = null;
   }
 }
+
+export function playNukeReady() {
+  const ctx = getAudioContext();
+  const notes = [880, 1175, 1760];
+  notes.forEach((freq, i) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(getMasterGain());
+    osc.type = 'square';
+    const t = ctx.currentTime + i * 0.1;
+    osc.frequency.setValueAtTime(freq, t);
+    gain.gain.setValueAtTime(0.12, t);
+    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.15);
+    osc.start(t);
+    osc.stop(t + 0.15);
+  });
+}
+
+export function playNukeLaunch() {
+  const ctx = getAudioContext();
+
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain);
+  gain.connect(getMasterGain());
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(200, ctx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(2000, ctx.currentTime + 0.5);
+  osc.frequency.exponentialRampToValueAtTime(4000, ctx.currentTime + 0.8);
+  gain.gain.setValueAtTime(0.15, ctx.currentTime);
+  gain.gain.linearRampToValueAtTime(0.2, ctx.currentTime + 0.5);
+  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.0);
+  osc.start(ctx.currentTime);
+  osc.stop(ctx.currentTime + 1.0);
+
+  const rOsc = ctx.createOscillator();
+  const rGain = ctx.createGain();
+  rOsc.connect(rGain);
+  rGain.connect(getMasterGain());
+  rOsc.type = 'sawtooth';
+  rOsc.frequency.setValueAtTime(50, ctx.currentTime);
+  rOsc.frequency.linearRampToValueAtTime(80, ctx.currentTime + 0.8);
+  rGain.gain.setValueAtTime(0.1, ctx.currentTime);
+  rGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.0);
+  rOsc.start(ctx.currentTime);
+  rOsc.stop(ctx.currentTime + 1.0);
+}
+
+let warningNodes = null;
+
+export function playNukeWarning() {
+  const ctx = getAudioContext();
+  const nodes = [];
+  for (let i = 0; i < 6; i++) {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(getMasterGain());
+    osc.type = 'square';
+    const t = ctx.currentTime + i * 0.25;
+    const freq = i % 2 === 0 ? 800 : 600;
+    osc.frequency.setValueAtTime(freq, t);
+    gain.gain.setValueAtTime(0.12, t);
+    gain.gain.setValueAtTime(0.12, t + 0.2);
+    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.24);
+    osc.start(t);
+    osc.stop(t + 0.25);
+    nodes.push(osc, gain);
+  }
+  warningNodes = nodes;
+}
+
+export function stopNukeWarning() {
+  if (warningNodes) {
+    const ctx = getAudioContext();
+    warningNodes.forEach(node => {
+      try {
+        if (node instanceof OscillatorNode) node.stop(ctx.currentTime + 0.01);
+        if (node instanceof GainNode) node.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.01);
+      } catch (e) { /* already stopped */ }
+    });
+    warningNodes = null;
+  }
+}
+
+export function playNukeExplosion() {
+  const ctx = getAudioContext();
+
+  const bufferSize = ctx.sampleRate * 0.5;
+  const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+  const output = noiseBuffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) {
+    output[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.15));
+  }
+  const noise = ctx.createBufferSource();
+  noise.buffer = noiseBuffer;
+  const noiseGain = ctx.createGain();
+  noise.connect(noiseGain);
+  noiseGain.connect(getMasterGain());
+  noiseGain.gain.setValueAtTime(0.3, ctx.currentTime);
+  noiseGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8);
+  noise.start(ctx.currentTime);
+
+  const bassOsc = ctx.createOscillator();
+  const bassGain = ctx.createGain();
+  bassOsc.connect(bassGain);
+  bassGain.connect(getMasterGain());
+  bassOsc.type = 'sine';
+  bassOsc.frequency.setValueAtTime(60, ctx.currentTime);
+  bassOsc.frequency.exponentialRampToValueAtTime(20, ctx.currentTime + 0.5);
+  bassGain.gain.setValueAtTime(0.25, ctx.currentTime);
+  bassGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.7);
+  bassOsc.start(ctx.currentTime);
+  bassOsc.stop(ctx.currentTime + 0.7);
+
+  const crackOsc = ctx.createOscillator();
+  const crackGain = ctx.createGain();
+  crackOsc.connect(crackGain);
+  crackGain.connect(getMasterGain());
+  crackOsc.type = 'sawtooth';
+  crackOsc.frequency.setValueAtTime(400, ctx.currentTime + 0.1);
+  crackOsc.frequency.exponentialRampToValueAtTime(50, ctx.currentTime + 1.0);
+  crackGain.gain.setValueAtTime(0.0, ctx.currentTime);
+  crackGain.gain.linearRampToValueAtTime(0.1, ctx.currentTime + 0.15);
+  crackGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.2);
+  crackOsc.start(ctx.currentTime);
+  crackOsc.stop(ctx.currentTime + 1.2);
+}
+
+export function playNukeHit() {
+  const ctx = getAudioContext();
+  const notes = [523, 784, 1047];
+  notes.forEach((freq, i) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(getMasterGain());
+    osc.type = 'square';
+    const t = ctx.currentTime + i * 0.08;
+    osc.frequency.setValueAtTime(freq, t);
+    gain.gain.setValueAtTime(0.15, t);
+    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.12);
+    osc.start(t);
+    osc.stop(t + 0.12);
+  });
+}
+
+export function playNukeMiss() {
+  const ctx = getAudioContext();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain);
+  gain.connect(getMasterGain());
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(400, ctx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(150, ctx.currentTime + 0.4);
+  gain.gain.setValueAtTime(0.12, ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+  osc.start(ctx.currentTime);
+  osc.stop(ctx.currentTime + 0.5);
+}

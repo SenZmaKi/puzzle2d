@@ -742,6 +742,158 @@ export class PuzzleEngine {
     runTransition();
   }
 
+  nukeStrike(sectionRow, sectionCol, gridRows = 3, gridCols = 3) {
+    return new Promise((resolve) => {
+      const colStart = Math.floor(sectionCol * this.cols / gridCols);
+      const colEnd = Math.floor((sectionCol + 1) * this.cols / gridCols);
+      const rowStart = Math.floor(sectionRow * this.rows / gridRows);
+      const rowEnd = Math.floor((sectionRow + 1) * this.rows / gridRows);
+
+      const sectionX = this.boardX + colStart * this.pieceW;
+      const sectionY = this.boardY + rowStart * this.pieceH;
+      const sectionW = (colEnd - colStart) * this.pieceW;
+      const sectionH = (rowEnd - rowStart) * this.pieceH;
+      const centerX = sectionX + sectionW / 2;
+      const centerY = sectionY + sectionH / 2;
+      const maxRadius = Math.max(this.boardW, this.boardH);
+
+      const rng = createRNG(Date.now());
+      const pad = this.pieceW * 0.3;
+      const zones = [
+        { x1: pad, x2: this.boardX - this.pieceW * 0.8, y1: pad, y2: this.displayHeight - this.pieceH - pad },
+        { x1: this.boardX + this.boardW + this.pieceW * 0.2, x2: this.displayWidth - this.pieceW - pad, y1: pad, y2: this.displayHeight - this.pieceH - pad },
+      ];
+      const validZones = zones.filter(z => z.x2 > z.x1 && z.y2 > z.y1);
+      if (validZones.length === 0) {
+        validZones.push({ x1: pad, x2: this.displayWidth - this.pieceW - pad, y1: pad, y2: this.displayHeight - this.pieceH - pad });
+      }
+
+      const affectedPieces = [];
+      const scatterTargets = [];
+
+      for (const p of this.pieces) {
+        if (p.placed && p.col >= colStart && p.col < colEnd && p.row >= rowStart && p.row < rowEnd) {
+          const zone = validZones[Math.floor(rng() * validZones.length)];
+          const tx = zone.x1 + rng() * Math.max(0, zone.x2 - zone.x1);
+          const ty = zone.y1 + rng() * Math.max(0, zone.y2 - zone.y1);
+          affectedPieces.push(p);
+          scatterTargets.push({ x: tx, y: ty });
+        }
+      }
+
+      if (affectedPieces.length === 0) {
+        const duration = 600;
+        const t0 = performance.now();
+        const animate = (now) => {
+          const t = Math.min((now - t0) / duration, 1);
+          this.render();
+          const ctx = this.ctx;
+          ctx.save();
+          if (t < 0.3) {
+            const alpha = (1 - t / 0.3) * 0.5;
+            ctx.fillStyle = `rgba(255, 150, 50, ${alpha})`;
+            ctx.fillRect(sectionX - 10, sectionY - 10, sectionW + 20, sectionH + 20);
+          }
+          ctx.restore();
+          if (t < 1) requestAnimationFrame(animate);
+          else { this.render(); resolve(0); }
+        };
+        requestAnimationFrame(animate);
+        return;
+      }
+
+      const origPositions = affectedPieces.map(p => ({ x: p.x, y: p.y }));
+
+      affectedPieces.forEach(p => {
+        p.placed = false;
+        this.placedCount--;
+        p.groupId = p.id;
+        this.groups.set(p.id, new Set([p.id]));
+      });
+
+      const duration = 1500;
+      const t0 = performance.now();
+      const origTransform = this.canvas.style.transform || '';
+
+      const animate = (now) => {
+        const elapsed = now - t0;
+        const t = Math.min(elapsed / duration, 1);
+
+        const pieceT = Math.max(0, Math.min((t - 0.2) / 0.6, 1));
+        const pieceEase = 1 - Math.pow(1 - pieceT, 3);
+
+        affectedPieces.forEach((p, i) => {
+          p.x = origPositions[i].x + (scatterTargets[i].x - origPositions[i].x) * pieceEase;
+          p.y = origPositions[i].y + (scatterTargets[i].y - origPositions[i].y) * pieceEase;
+        });
+
+        this.render();
+
+        const ctx = this.ctx;
+        ctx.save();
+
+        if (t < 0.15) {
+          const alpha = (1 - t / 0.15) * 0.9;
+          ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+          ctx.fillRect(0, 0, this.displayWidth, this.displayHeight);
+        }
+
+        if (t > 0.03 && t < 0.6) {
+          const st = (t - 0.03) / 0.57;
+          const radius = st * maxRadius;
+          const ringW = Math.max(2, (1 - st) * 25);
+          const alpha = (1 - st) * 0.7;
+
+          ctx.beginPath();
+          ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+          ctx.strokeStyle = `rgba(255, 80, 30, ${alpha})`;
+          ctx.lineWidth = ringW;
+          ctx.stroke();
+
+          if (radius > 10) {
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius * 0.7, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(255, 200, 80, ${alpha * 0.5})`;
+            ctx.lineWidth = ringW * 0.4;
+            ctx.stroke();
+          }
+        }
+
+        if (t > 0.05 && t < 0.4) {
+          const ft = (t - 0.05) / 0.35;
+          const fireAlpha = (1 - ft) * 0.6;
+          const grad = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, maxRadius * 0.5);
+          grad.addColorStop(0, `rgba(255, 200, 50, ${fireAlpha})`);
+          grad.addColorStop(0.4, `rgba(255, 80, 20, ${fireAlpha * 0.6})`);
+          grad.addColorStop(1, 'rgba(200, 0, 0, 0)');
+          ctx.fillStyle = grad;
+          ctx.fillRect(0, 0, this.displayWidth, this.displayHeight);
+        }
+
+        ctx.restore();
+
+        if (t < 0.5) {
+          const intensity = (1 - t / 0.5) * 10;
+          const sx = (Math.random() - 0.5) * intensity;
+          const sy = (Math.random() - 0.5) * intensity;
+          this.canvas.style.transform = `translate(${sx}px, ${sy}px)`;
+        } else {
+          this.canvas.style.transform = origTransform;
+        }
+
+        if (t < 1) {
+          requestAnimationFrame(animate);
+        } else {
+          this.canvas.style.transform = origTransform;
+          this.render();
+          resolve(affectedPieces.length);
+        }
+      };
+
+      requestAnimationFrame(animate);
+    });
+  }
+
   destroy() {
     log.debug('Destroying puzzle engine');
     this.canvas.removeEventListener('mousedown', this._boundMouseDown);
