@@ -37,10 +37,10 @@ COPY client/public/sounds/ /app/client/public/sounds/
 # Create directories for persistent data
 RUN mkdir -p /app/server/uploads /app/data
 
-EXPOSE 3001
+EXPOSE 3000
 
 ENV NODE_ENV=production
-ENV PORT=3001
+ENV PORT=3000
 ENV DB_PATH=/app/data/puzzle2d.db
 
 CMD ["node", "server/index.js"]

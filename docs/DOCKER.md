@@ -20,7 +20,7 @@ docker compose logs -f
 docker compose down
 ```
 
-The app will be available at **http://localhost:3001**.
+The app will be available at **http://localhost:3000**.
 
 ## Architecture
 
@@ -61,7 +61,7 @@ Configure via `docker-compose.yml` or `docker run -e`:
 
 | Variable    | Default                | Description                                |
 |-------------|------------------------|--------------------------------------------|
-| `PORT`      | `3001`                 | Port the server listens on                 |
+| `PORT`      | `3000`                 | Port the server listens on                 |
 | `NODE_ENV`  | `production`           | Set automatically in Dockerfile            |
 | `DB_PATH`   | `/app/data/puzzle2d.db`| SQLite database file location              |
 | `LOG_LEVEL` | `info`                 | Logging verbosity: `debug`, `info`, `warn`, `error` |
@@ -75,13 +75,13 @@ To expose on a different host port:
 services:
   puzzle2d:
     ports:
-      - "8080:3001"  # Access at http://localhost:8080
+      - "8080:3000"  # Access at http://localhost:8080
 ```
 
 Or with `docker run`:
 
 ```bash
-docker run -p 8080:3001 puzzle2d
+docker run -p 8080:3000 puzzle2d
 ```
 
 ## Adding Background Music
@@ -109,7 +109,7 @@ docker build -t puzzle2d .
 # Run the container
 docker run -d \
   --name puzzle2d \
-  -p 3001:3001 \
+  -p 3000:3000 \
   -v puzzle2d-uploads:/app/server/uploads \
   -v puzzle2d-db:/app/data \
   puzzle2d
@@ -128,7 +128,7 @@ environment:
 Or:
 
 ```bash
-docker run -e LOG_LEVEL=debug -p 3001:3001 puzzle2d
+docker run -e LOG_LEVEL=debug -p 3000:3000 puzzle2d
 ```
 
 Server logs include:
@@ -142,7 +142,7 @@ Server logs include:
 Check if the server is responding:
 
 ```bash
-curl http://localhost:3001/api/games
+curl http://localhost:3000/api/games
 # Returns JSON array of games (empty if none created)
 ```
 
@@ -185,7 +185,7 @@ docker compose logs puzzle2d
 ```
 
 Common issues:
-- Port 3001 already in use → change the host port in `docker-compose.yml`
+- Port 3000 already in use → change the host port in `docker-compose.yml`
 - Permission issues with volumes → ensure Docker has write access
 
 ### Database locked errors

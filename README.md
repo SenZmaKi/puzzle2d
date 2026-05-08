@@ -36,7 +36,7 @@ npm run dev
 
 The app will be available at:
 - **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:3001
+- **Backend API**: http://localhost:3000
 
 ### Production Build
 
@@ -48,7 +48,7 @@ npm run build
 npm start
 ```
 
-Then open http://localhost:3001.
+Then open http://localhost:3000.
 
 ## How to Play
 
@@ -110,7 +110,7 @@ Place `.mp3`, `.ogg`, `.wav`, `.m4a`, or `.flac` files in `client/public/sounds/
 
 | Variable    | Default                    | Description                       |
 |-------------|----------------------------|-----------------------------------|
-| `PORT`      | `3001`                     | Server port                       |
+| `PORT`      | `3000`                     | Server port                       |
 | `NODE_ENV`  | `development`              | `production` serves built client  |
 | `DB_PATH`   | `server/puzzle2d.db`       | SQLite database file path         |
 | `LOG_LEVEL` | `info`                     | Server log level: debug/info/warn/error |

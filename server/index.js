@@ -53,7 +53,7 @@ app.get('*', (req, res) => {
 // WebSocket
 setupSocket(io);
 
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3000;
 httpServer.listen(PORT, () => {
   log.info(`🧩 Puzzle2D server running on port ${PORT}`);
 });
