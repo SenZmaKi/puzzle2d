@@ -5,6 +5,8 @@ import {
   playSnapSound,
   playTimelapseSound,
   stopTimelapseSound,
+  playPreviewSound,
+  stopPreviewSound,
   playNukeReady,
   playNukeLaunch,
   playNukeWarning,
@@ -13,7 +15,7 @@ import {
   playNukeHit,
   playNukeMiss,
 } from '../utils/sounds';
-import { Timer, Puzzle, X, Users, Layers, Rewind, Crosshair } from 'lucide-react';
+import { Timer, Puzzle, X, Users, Layers, Rewind, Eye, Crosshair } from 'lucide-react';
 
 const NUKE_CHARGE_TIERS = [30000, 60000, 90000, 120000];
 
@@ -30,6 +32,8 @@ export default function Game({
   onNukeHandled,
   nukeResult,
   onNukeResultSeen,
+  savedPieceState,
+  savedTimerMs,
 }) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
@@ -39,6 +43,7 @@ export default function Game({
   const [timer, setTimer] = useState(0);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [isReplaying, setIsReplaying] = useState(false);
+  const [isPreviewMode, setIsPreviewMode] = useState(false);
   const timerRef = useRef(null);
   const startTimeRef = useRef(null);
 
@@ -62,23 +67,13 @@ export default function Game({
   );
 
   useEffect(() => {
-    startTimeRef.current = Date.now();
-    timerRef.current = setInterval(() => {
-      setTimer(Date.now() - startTimeRef.current);
-    }, 100);
-
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [currentRound]);
-
-  useEffect(() => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
       setImageLoaded(true);
       setTotalPieces(roundConfig.pieces);
       setPlacedCount(0);
+      setTimer(0);
 
       if (canvasRef.current) {
         if (engineRef.current) engineRef.current.destroy();
@@ -94,9 +89,17 @@ export default function Game({
             setPlacedCount(placed);
             onPiecePlaced(placed, total);
             playSnapSound();
+            localStorage.setItem(
+              `puzzle2d_pieces_${gameData.id}_r${currentRound}`,
+              JSON.stringify(engine.getState())
+            );
           },
           onPieceConnected: () => {
             playConnectSound();
+            localStorage.setItem(
+              `puzzle2d_pieces_${gameData.id}_r${currentRound}`,
+              JSON.stringify(engine.getState())
+            );
           },
           onComplete: () => {
             const elapsed = Date.now() - startTimeRef.current;
@@ -118,11 +121,47 @@ export default function Game({
 
         engine.init();
         engineRef.current = engine;
+
+        if (savedPieceState) {
+          // Restore saved state — skip preview, resume from where we left off
+          const restoredProgress = engine.restoreState(savedPieceState);
+          setPlacedCount(restoredProgress);
+          const elapsed = savedTimerMs || 0;
+          startTimeRef.current = Date.now() - elapsed;
+          setTimer(elapsed);
+          timerRef.current = setInterval(() => {
+            setTimer(Date.now() - startTimeRef.current);
+          }, 100);
+        } else {
+          // Fresh start — show solved preview then scatter pieces
+          setIsPreviewMode(true);
+          playPreviewSound();
+          engine.playRoundPreview(4000, 1800).then(() => {
+            stopPreviewSound();
+            setIsPreviewMode(false);
+            startTimeRef.current = Date.now();
+            // Save both timer start and initial piece state together so a refresh
+            // right after preview (before any snaps) still skips the preview
+            localStorage.setItem(
+              `puzzle2d_timer_${gameData.id}_r${currentRound}`,
+              String(startTimeRef.current)
+            );
+            localStorage.setItem(
+              `puzzle2d_pieces_${gameData.id}_r${currentRound}`,
+              JSON.stringify(engine.getState())
+            );
+            timerRef.current = setInterval(() => {
+              setTimer(Date.now() - startTimeRef.current);
+            }, 100);
+          });
+        }
       }
     };
     img.src = imageSrc;
 
     return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+      stopPreviewSound();
       if (engineRef.current) {
         engineRef.current.destroy();
         engineRef.current = null;
@@ -173,7 +212,7 @@ export default function Game({
 
   // Handle incoming nuke
   useEffect(() => {
-    if (!incomingNuke || nukeHandlingRef.current || !engineRef.current || engineRef.current.completed || isReplaying) return;
+    if (!incomingNuke || nukeHandlingRef.current || !engineRef.current || engineRef.current.completed || isReplaying || isPreviewMode) return;
     nukeHandlingRef.current = true;
 
     const { fromPlayerId, fromPlayerName, sectionRow, sectionCol } = incomingNuke;
@@ -393,6 +432,14 @@ export default function Game({
           <div className="loading-overlay">
             <div className="loading-spinner" />
             <p>Loading puzzle...</p>
+          </div>
+        )}
+        {isPreviewMode && (
+          <div className="preview-overlay">
+            <div className="preview-badge">
+              <Eye size={14} className="preview-icon" />
+              <span>PREVIEW</span>
+            </div>
           </div>
         )}
         {isReplaying && (

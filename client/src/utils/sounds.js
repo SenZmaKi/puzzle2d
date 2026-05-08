@@ -147,6 +147,79 @@ export function playErrorSound() {
   osc.stop(ctx.currentTime + 0.25);
 }
 
+// Round preview sound — descending hum + decelerating scatter ticks
+let previewNodes = null;
+
+export function playPreviewSound() {
+  const ctx = getAudioContext();
+  const nodes = [];
+
+  // Opening reveal shimmer
+  const shimmerOsc = ctx.createOscillator();
+  const shimmerGain = ctx.createGain();
+  shimmerOsc.connect(shimmerGain);
+  shimmerGain.connect(getMasterGain());
+  shimmerOsc.type = 'sawtooth';
+  shimmerOsc.frequency.setValueAtTime(1200, ctx.currentTime);
+  shimmerOsc.frequency.exponentialRampToValueAtTime(300, ctx.currentTime + 0.6);
+  shimmerGain.gain.setValueAtTime(0.0, ctx.currentTime);
+  shimmerGain.gain.linearRampToValueAtTime(0.07, ctx.currentTime + 0.1);
+  shimmerGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.7);
+  shimmerOsc.start(ctx.currentTime);
+  shimmerOsc.stop(ctx.currentTime + 0.75);
+  nodes.push(shimmerOsc, shimmerGain);
+
+  // Descending hum across hold + flyout (~5.8s total)
+  const humOsc = ctx.createOscillator();
+  const humGain = ctx.createGain();
+  humOsc.connect(humGain);
+  humGain.connect(getMasterGain());
+  humOsc.type = 'sawtooth';
+  humOsc.frequency.setValueAtTime(160, ctx.currentTime + 0.1);
+  humOsc.frequency.linearRampToValueAtTime(60, ctx.currentTime + 5.8);
+  humGain.gain.setValueAtTime(0.04, ctx.currentTime + 0.1);
+  humGain.gain.linearRampToValueAtTime(0.06, ctx.currentTime + 1.5);
+  humGain.gain.linearRampToValueAtTime(0.05, ctx.currentTime + 4.0);
+  humGain.gain.linearRampToValueAtTime(0.02, ctx.currentTime + 5.8);
+  humOsc.start(ctx.currentTime + 0.1);
+  humOsc.stop(ctx.currentTime + 5.9);
+  nodes.push(humOsc, humGain);
+
+  // Scatter ticks — start rapid then decelerate, aligned to flyout start at 4s
+  const tickCount = 28;
+  for (let i = 0; i < tickCount; i++) {
+    const norm = i / tickCount;
+    // sqrt gives deceleration: lots of ticks early, fewer late
+    const time = 4.0 + Math.sqrt(norm) * 1.7;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(getMasterGain());
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(1400 - norm * 900, ctx.currentTime + time);
+    gain.gain.setValueAtTime(0.05 - norm * 0.03, ctx.currentTime + time);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + time + 0.05);
+    osc.start(ctx.currentTime + time);
+    osc.stop(ctx.currentTime + time + 0.06);
+    nodes.push(osc, gain);
+  }
+
+  previewNodes = nodes;
+}
+
+export function stopPreviewSound() {
+  if (previewNodes) {
+    const ctx = getAudioContext();
+    previewNodes.forEach(node => {
+      try {
+        if (node instanceof OscillatorNode) node.stop(ctx.currentTime + 0.05);
+        if (node instanceof GainNode) node.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
+      } catch (e) { /* already stopped */ }
+    });
+    previewNodes = null;
+  }
+}
+
 // Timelapse replay sound — fast-forward whirring + rhythmic ticks
 let timelapseNodes = null;
 

@@ -6,6 +6,8 @@ const log = createLogger('socket');
 
 // Track active socket connections: socketId -> { playerId, gameId, playerName }
 const activeSockets = new Map();
+// Track games that have been started so late joiners can skip the lobby
+const startedGames = new Set();
 
 export function setupSocket(io) {
   io.on('connection', (socket) => {
@@ -27,10 +29,17 @@ export function setupSocket(io) {
       }
       log.info('Player joined room', { gameId, playerId, playerName, roomSize: playersInRoom.length });
       io.to(gameId).emit('players_update', playersInRoom);
+
+      // If game already started, tell this player immediately so they skip the lobby
+      if (startedGames.has(gameId)) {
+        log.info('Late joiner — game already started', { gameId, playerName });
+        socket.emit('game_started');
+      }
     });
 
     socket.on('start_game', ({ gameId }) => {
       log.info('Game started', { gameId });
+      startedGames.add(gameId);
       io.to(gameId).emit('game_started');
     });
 

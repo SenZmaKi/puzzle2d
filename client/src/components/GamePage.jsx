@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import socket from '../utils/socket';
 import createLogger from '../utils/logger';
@@ -23,6 +23,10 @@ export default function GamePage() {
   const [error, setError] = useState('');
   const [incomingNuke, setIncomingNuke] = useState(null);
   const [nukeResult, setNukeResult] = useState(null);
+  const [savedPieceState, setSavedPieceState] = useState(null);
+  const [savedTimerMs, setSavedTimerMs] = useState(0);
+  // True when we're restoring from localStorage — guards against game_started resetting state
+  const isRestoredRef = useRef(false);
 
   // Load game data
   useEffect(() => {
@@ -35,19 +39,53 @@ export default function GamePage() {
       .then((data) => {
         log.info('Game data loaded', { gameId, rounds: data.rounds?.length, players: data.players?.length });
         setGameData(data);
-        // Check if already joined
-        const stored = localStorage.getItem(`puzzle2d_player_${gameId}`);
-        if (stored) {
-          const info = JSON.parse(stored);
+
+        const storedPlayer = localStorage.getItem(`puzzle2d_player_${gameId}`);
+        const storedState = localStorage.getItem(`puzzle2d_state_${gameId}`);
+
+        if (storedPlayer) {
+          const info = JSON.parse(storedPlayer);
           log.info('Resuming session', { playerId: info.playerId, playerName: info.playerName });
           setPlayerInfo(info);
-          setPhase('lobby');
+
+          if (storedState) {
+            const state = JSON.parse(storedState);
+            const round = state.currentRound || 0;
+            setCurrentRound(round);
+            log.info('Restoring game state', { phase: state.phase, round });
+
+            // Mark as restored so game_started events don't override our state
+            isRestoredRef.current = true;
+
+            if (state.phase === 'playing') {
+              const savedPiecesStr = localStorage.getItem(`puzzle2d_pieces_${gameId}_r${round}`);
+              if (savedPiecesStr) {
+                setSavedPieceState(JSON.parse(savedPiecesStr));
+                const savedStart = localStorage.getItem(`puzzle2d_timer_${gameId}_r${round}`);
+                if (savedStart) setSavedTimerMs(Date.now() - parseInt(savedStart, 10));
+              }
+              // Always go to playing even if no piece state yet (e.g. refreshed during preview)
+              setPhase('playing');
+            } else if (state.phase === 'round_complete') {
+              setRoundTime(state.roundTime || 0);
+              setPhase('round_complete');
+            } else if (state.phase === 'game_complete') {
+              setPhase('game_complete');
+            } else {
+              setPhase('lobby');
+            }
+          } else {
+            setPhase('lobby');
+          }
         } else {
           setPhase('join');
         }
       })
       .catch((err) => {
         log.error('Failed to load game', { gameId, error: err.message });
+        // Clear stale session data for a game that no longer exists
+        localStorage.removeItem(`puzzle2d_player_${gameId}`);
+        localStorage.removeItem(`puzzle2d_state_${gameId}`);
         setError('Game not found!');
         setPhase('error');
       });
@@ -72,6 +110,11 @@ export default function GamePage() {
     });
 
     socket.on('game_started', () => {
+      // Ignore if we already restored state from localStorage (don't reset our round/progress)
+      if (isRestoredRef.current) {
+        log.debug('Ignoring game_started — already restored from saved state');
+        return;
+      }
       log.info('Game started');
       setPhase('playing');
       setCurrentRound(0);
@@ -111,6 +154,10 @@ export default function GamePage() {
       // Notification handled by players_update
     });
 
+    socket.on('player_cancelled', ({ playerName }) => {
+      log.info('Game cancelled by player', { playerName });
+    });
+
     return () => {
       log.debug('Cleaning up socket listeners');
       socket.off('players_update');
@@ -121,9 +168,27 @@ export default function GamePage() {
       socket.off('nuke_result');
       socket.off('player_joined');
       socket.off('player_left');
+      socket.off('player_cancelled');
       socket.disconnect();
     };
   }, [playerInfo, gameData, gameId]);
+
+  // Auto-save game state to localStorage whenever phase/round/roundTime changes
+  useEffect(() => {
+    if (!gameId || ['loading', 'error', 'join'].includes(phase)) return;
+    const state = { phase, currentRound, roundTime };
+    localStorage.setItem(`puzzle2d_state_${gameId}`, JSON.stringify(state));
+  }, [gameId, phase, currentRound, roundTime]);
+
+  const clearGamePersistence = useCallback(() => {
+    localStorage.removeItem(`puzzle2d_player_${gameId}`);
+    localStorage.removeItem(`puzzle2d_state_${gameId}`);
+    const rounds = gameData?.rounds?.length ?? 10;
+    for (let r = 0; r < rounds; r++) {
+      localStorage.removeItem(`puzzle2d_pieces_${gameId}_r${r}`);
+      localStorage.removeItem(`puzzle2d_timer_${gameId}_r${r}`);
+    }
+  }, [gameId, gameData]);
 
   const handleJoin = async (name) => {
     try {
@@ -178,6 +243,12 @@ export default function GamePage() {
   };
 
   const handleNextRound = () => {
+    // Clear persisted state for the round just completed
+    localStorage.removeItem(`puzzle2d_pieces_${gameId}_r${currentRound}`);
+    localStorage.removeItem(`puzzle2d_timer_${gameId}_r${currentRound}`);
+    setSavedPieceState(null);
+    setSavedTimerMs(0);
+
     const nextRound = currentRound + 1;
     if (nextRound >= gameData.rounds.length) {
       log.info('All rounds complete, showing final results');
@@ -228,11 +299,17 @@ export default function GamePage() {
 
   const handleCancel = () => {
     log.info('Player cancelling game', { gameId });
+    clearGamePersistence();
     socket.emit('game_cancelled', {
       gameId,
       playerId: playerInfo.playerId,
       playerName: playerInfo.playerName,
     });
+    navigate('/');
+  };
+
+  const handleHome = () => {
+    clearGamePersistence();
     navigate('/');
   };
 
@@ -288,6 +365,8 @@ export default function GamePage() {
         onNukeHandled={handleNukeHandled}
         nukeResult={nukeResult}
         onNukeResultSeen={handleNukeResultSeen}
+        savedPieceState={savedPieceState}
+        savedTimerMs={savedTimerMs}
       />
     );
   }
@@ -310,7 +389,7 @@ export default function GamePage() {
         gameId={gameId}
         playerInfo={playerInfo}
         gameData={gameData}
-        onHome={() => navigate('/')}
+        onHome={handleHome}
       />
     );
   }

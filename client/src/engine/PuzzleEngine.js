@@ -624,6 +624,42 @@ export class PuzzleEngine {
     );
   }
 
+  getState() {
+    return this.pieces.map(p => ({
+      id: p.id,
+      x: p.x,
+      y: p.y,
+      placed: p.placed,
+      groupId: p.groupId,
+    }));
+  }
+
+  restoreState(pieceState) {
+    for (const saved of pieceState) {
+      const piece = this.pieces.find(p => p.id === saved.id);
+      if (!piece) continue;
+      piece.x = saved.x;
+      piece.y = saved.y;
+      piece.placed = saved.placed;
+      piece.groupId = saved.groupId;
+    }
+
+    this.groups.clear();
+    for (const piece of this.pieces) {
+      if (!piece.placed) {
+        if (!this.groups.has(piece.groupId)) {
+          this.groups.set(piece.groupId, new Set());
+        }
+        this.groups.get(piece.groupId).add(piece.id);
+      }
+    }
+
+    this.placedCount = this.pieces.filter(p => p.placed).length;
+    if (this.placedCount === this.totalPieces) this.completed = true;
+    this.render();
+    return this._getProgress();
+  }
+
   _disableInput() {
     this.canvas.removeEventListener('mousedown', this._boundMouseDown);
     window.removeEventListener('mousemove', this._boundMouseMove);
@@ -641,6 +677,56 @@ export class PuzzleEngine {
     this.canvas.addEventListener('touchstart', this._boundTouchStart, { passive: false });
     window.addEventListener('touchmove', this._boundTouchMove, { passive: false });
     window.addEventListener('touchend', this._boundTouchEnd);
+  }
+
+  // Show solved image then animate pieces flying out to scatter positions
+  playRoundPreview(holdDuration = 900, flyoutDuration = 1800) {
+    return new Promise((resolve) => {
+      this._disableInput();
+
+      // Place all pieces at solved positions
+      this.pieces.forEach(p => {
+        p.x = p.targetX;
+        p.y = p.targetY;
+        p.placed = true;
+      });
+      this.render();
+
+      setTimeout(() => {
+        // Lift pieces off board (shadows appear)
+        this.pieces.forEach(p => { p.placed = false; });
+
+        const initialMap = new Map(this.initialPositions.map(ip => [ip.id, ip]));
+        const t0 = performance.now();
+
+        const animate = (now) => {
+          const t = Math.min((now - t0) / flyoutDuration, 1);
+          // Cubic ease-in: slow start then accelerates outward
+          const ease = t * t * t;
+
+          this.pieces.forEach(p => {
+            const init = initialMap.get(p.id);
+            p.x = p.targetX + (init.x - p.targetX) * ease;
+            p.y = p.targetY + (init.y - p.targetY) * ease;
+          });
+          this.render();
+
+          if (t < 1) {
+            requestAnimationFrame(animate);
+          } else {
+            this.pieces.forEach(p => {
+              const init = initialMap.get(p.id);
+              p.x = init.x;
+              p.y = init.y;
+            });
+            this.render();
+            this._enableInput();
+            resolve();
+          }
+        };
+        requestAnimationFrame(animate);
+      }, holdDuration);
+    });
   }
 
   // Replay the full puzzle assembly as a timelapse
