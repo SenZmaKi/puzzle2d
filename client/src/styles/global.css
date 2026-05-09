@@ -1993,6 +1993,33 @@ body {
   opacity: 1;
 }
 
+.nuke-targets-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem 0;
+  color: var(--text-dim);
+  font-family: var(--font-display);
+  font-size: 0.4rem;
+  letter-spacing: 0.1em;
+}
+
+.nuke-targets-loading .loading-spinner {
+  width: 20px;
+  height: 20px;
+  border-width: 2px;
+}
+
+.nuke-targets-empty {
+  text-align: center;
+  padding: 0.8rem 0;
+  color: var(--text-dim);
+  font-family: var(--font-display);
+  font-size: 0.4rem;
+  letter-spacing: 0.1em;
+}
+
 .nuke-cancel-btn {
   width: 100%;
   margin-top: 0.5rem;
@@ -2145,11 +2172,11 @@ body {
 
 /* Nuke launched toast */
 .nuke-launched-toast {
-  position: absolute;
+  position: fixed;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  z-index: 20;
+  z-index: 50;
   display: flex;
   align-items: center;
   gap: 0.6rem;
@@ -2176,13 +2203,13 @@ body {
   to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 }
 
-/* Nuke result toast (hit / miss) */
+/* Nuke result toast (hit / miss) — fixed so overflow:hidden on puzzle-area can't clip it */
 .nuke-result-toast {
-  position: absolute;
+  position: fixed;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  z-index: 20;
+  z-index: 50;
   display: flex;
   align-items: center;
   gap: 0.7rem;
@@ -2265,4 +2292,57 @@ body {
   .nuke-target-title {
     font-size: 0.45rem;
   }
+}
+
+/* ============ QUIT CONFIRMATION DIALOG ============ */
+.quit-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+  animation: fadeIn 0.15s ease-out;
+}
+
+.quit-confirm-dialog {
+  background: var(--bg-card);
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  padding: 2rem 2.5rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  box-shadow: 0 0 40px rgba(220, 20, 60, 0.2), 0 20px 60px rgba(0, 0, 0, 0.6);
+  animation: cardSlideUp 0.2s ease-out;
+  min-width: 280px;
+}
+
+.quit-confirm-icon {
+  color: var(--red-primary);
+  opacity: 0.7;
+}
+
+.quit-confirm-title {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  letter-spacing: 0.15em;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.quit-confirm-body {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  margin: 0;
+}
+
+.quit-confirm-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
 }

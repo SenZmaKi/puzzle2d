@@ -47,24 +47,26 @@ export default function Game({
   const timerRef = useRef(null);
   const startTimeRef = useRef(null);
 
+  const [showQuitConfirm, setShowQuitConfirm] = useState(false);
+
   const [nukeCharge, setNukeCharge] = useState(0);
   const [nukeReady, setNukeReady] = useState(false);
   const [nukeTargeting, setNukeTargeting] = useState('none');
   const [selectedOpponent, setSelectedOpponent] = useState(null);
   const [nukeWarning, setNukeWarning] = useState(null);
   const [nukeLaunched, setNukeLaunched] = useState(false);
-  const nukeChargeStartRef = useRef(Date.now());
+  const [nukeTargetsLoading, setNukeTargetsLoading] = useState(false);
+  const [nukeTargets, setNukeTargets] = useState(null);
+  const nukeChargeStartRef = useRef(null);
   const nukeReadySoundFiredRef = useRef(false);
   const nukeHandlingRef = useRef(false);
+  const nukeRestoredRef = useRef(false);
   const nukesFiredRef = useRef(0);
   const [nukeChargeTime, setNukeChargeTime] = useState(NUKE_CHARGE_TIERS[0]);
 
   const roundConfig = gameData.rounds[currentRound];
   const imageSrc = gameData.images[currentRound];
-
-  const opponentList = Object.entries(opponents).filter(
-    ([id]) => id !== playerInfo.playerId
-  );
+  const opponentList = Object.entries(opponents).filter(([id]) => id !== playerInfo.playerId);
 
   useEffect(() => {
     const img = new Image();
@@ -123,7 +125,6 @@ export default function Game({
         engineRef.current = engine;
 
         if (savedPieceState) {
-          // Restore saved state — skip preview, resume from where we left off
           const restoredProgress = engine.restoreState(savedPieceState);
           setPlacedCount(restoredProgress);
           const elapsed = savedTimerMs || 0;
@@ -133,15 +134,12 @@ export default function Game({
             setTimer(Date.now() - startTimeRef.current);
           }, 100);
         } else {
-          // Fresh start — show solved preview then scatter pieces
           setIsPreviewMode(true);
           playPreviewSound();
           engine.playRoundPreview(4000, 1800).then(() => {
             stopPreviewSound();
             setIsPreviewMode(false);
             startTimeRef.current = Date.now();
-            // Save both timer start and initial piece state together so a refresh
-            // right after preview (before any snaps) still skips the preview
             localStorage.setItem(
               `puzzle2d_timer_${gameData.id}_r${currentRound}`,
               String(startTimeRef.current)
@@ -180,23 +178,63 @@ export default function Game({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Reset nuke tier each round
+  // Restore or reset nuke state on round change
   useEffect(() => {
-    nukesFiredRef.current = 0;
-    setNukeChargeTime(NUKE_CHARGE_TIERS[0]);
+    const nukeKey = `puzzle2d_nuke_${gameData.id}_r${currentRound}`;
+    let saved = null;
+    try {
+      const s = localStorage.getItem(nukeKey);
+      if (s) saved = JSON.parse(s);
+    } catch {}
+
+    if (saved) {
+      nukesFiredRef.current = saved.nukesFired ?? 0;
+      nukeReadySoundFiredRef.current = false;
+      nukeRestoredRef.current = true;
+      nukeChargeStartRef.current = saved.chargeStart;
+      setNukeChargeTime(saved.nukeChargeTime ?? NUKE_CHARGE_TIERS[0]);
+      // nukeCharge / nukeReady will be resolved by the timer effect
+    } else {
+      nukesFiredRef.current = 0;
+      nukeReadySoundFiredRef.current = false;
+      nukeRestoredRef.current = false;
+      nukeChargeStartRef.current = null;
+      setNukeChargeTime(NUKE_CHARGE_TIERS[0]);
+      setNukeCharge(0);
+      setNukeReady(false);
+    }
   }, [currentRound]);
 
-  // Nuke charge timer
+  // Nuke charge timer — starts when the round timer starts (after preview)
   useEffect(() => {
-    if (opponentList.length === 0) return;
+    if (!imageLoaded || isPreviewMode) return;
 
-    nukeChargeStartRef.current = Date.now();
-    nukeReadySoundFiredRef.current = false;
-    setNukeCharge(0);
-    setNukeReady(false);
+    const nukeKey = `puzzle2d_nuke_${gameData.id}_r${currentRound}`;
+
+    if (nukeRestoredRef.current) {
+      nukeRestoredRef.current = false;
+      // Compute current charge from saved start time, set initial visual state
+      const elapsed = nukeChargeStartRef.current ? Date.now() - nukeChargeStartRef.current : 0;
+      const charge = Math.min(elapsed, nukeChargeTime);
+      setNukeCharge(charge);
+      if (charge >= nukeChargeTime) {
+        setNukeReady(true);
+        nukeReadySoundFiredRef.current = true;
+      }
+    } else {
+      nukeChargeStartRef.current = Date.now();
+      nukeReadySoundFiredRef.current = false;
+      setNukeCharge(0);
+      setNukeReady(false);
+      localStorage.setItem(nukeKey, JSON.stringify({
+        chargeStart: nukeChargeStartRef.current,
+        nukesFired: nukesFiredRef.current,
+        nukeChargeTime,
+      }));
+    }
 
     const interval = setInterval(() => {
-      if (nukeHandlingRef.current) return;
+      if (nukeHandlingRef.current || nukeChargeStartRef.current === null) return;
       const elapsed = Date.now() - nukeChargeStartRef.current;
       const charge = Math.min(elapsed, nukeChargeTime);
       setNukeCharge(charge);
@@ -208,7 +246,7 @@ export default function Game({
     }, 100);
 
     return () => clearInterval(interval);
-  }, [currentRound, opponentList.length, nukeChargeTime]);
+  }, [currentRound, nukeChargeTime, imageLoaded, isPreviewMode]);
 
   // Handle incoming nuke
   useEffect(() => {
@@ -220,6 +258,7 @@ export default function Game({
     if (nukeTargeting !== 'none') {
       setNukeTargeting('none');
       setSelectedOpponent(null);
+      setNukeTargets(null);
     }
 
     playNukeWarning();
@@ -255,11 +294,24 @@ export default function Game({
     return () => clearTimeout(t);
   }, [nukeResult]);
 
-  const handleNukeClick = useCallback(() => {
+  const handleNukeClick = useCallback(async () => {
     if (!nukeReady || isReplaying || nukeHandlingRef.current) return;
     setNukeTargeting('selectOpponent');
+    setNukeTargetsLoading(true);
+    setNukeTargets(null);
     if (engineRef.current) engineRef.current._disableInput();
-  }, [nukeReady, isReplaying]);
+
+    try {
+      const res = await fetch(`/api/games/${gameData.id}`);
+      const data = await res.json();
+      const targets = (data.players ?? []).filter((p) => p.id !== playerInfo.playerId);
+      setNukeTargets(targets);
+    } catch {
+      setNukeTargets(gameData.players.filter((p) => p.id !== playerInfo.playerId));
+    } finally {
+      setNukeTargetsLoading(false);
+    }
+  }, [nukeReady, isReplaying, gameData.id, gameData.players, playerInfo.playerId]);
 
   const handleSelectOpponent = useCallback((id, name) => {
     setSelectedOpponent({ id, name });
@@ -274,25 +326,34 @@ export default function Game({
 
     setNukeTargeting('none');
     setSelectedOpponent(null);
+    setNukeTargets(null);
     setNukeReady(false);
     nukeReadySoundFiredRef.current = false;
     nukeChargeStartRef.current = Date.now();
     setNukeCharge(0);
 
-    // Escalate cooldown for next nuke
     nukesFiredRef.current++;
     const nextTier = Math.min(nukesFiredRef.current, NUKE_CHARGE_TIERS.length - 1);
-    setNukeChargeTime(NUKE_CHARGE_TIERS[nextTier]);
+    const nextChargeTime = NUKE_CHARGE_TIERS[nextTier];
+    setNukeChargeTime(nextChargeTime);
+
+    localStorage.setItem(`puzzle2d_nuke_${gameData.id}_r${currentRound}`, JSON.stringify({
+      chargeStart: nukeChargeStartRef.current,
+      nukesFired: nukesFiredRef.current,
+      nukeChargeTime: nextChargeTime,
+    }));
 
     if (engineRef.current) engineRef.current._enableInput();
 
     setNukeLaunched(true);
     setTimeout(() => setNukeLaunched(false), 5000);
-  }, [selectedOpponent, onNukeLaunch]);
+  }, [selectedOpponent, onNukeLaunch, gameData.id, currentRound]);
 
   const handleCancelTargeting = useCallback(() => {
     setNukeTargeting('none');
     setSelectedOpponent(null);
+    setNukeTargets(null);
+    setNukeTargetsLoading(false);
     if (engineRef.current) engineRef.current._enableInput();
   }, []);
 
@@ -346,81 +407,101 @@ export default function Game({
         </div>
 
         <div className="hud-right">
-          {opponentList.length > 0 && (
-            <button
-              className={`nuke-btn ${nukeReady ? 'ready' : ''} ${nukeTargeting !== 'none' ? 'targeting' : ''}`}
-              onClick={handleNukeClick}
-              disabled={!nukeReady || isReplaying || nukeHandlingRef.current}
-            >
-              <span className="nuke-icon">☢</span>
-              <span className="nuke-label">
-                {nukeReady ? 'NUKE' : `${nukeSecondsLeft}s`}
-              </span>
-              {!nukeReady && (
-                <div className="nuke-charge-bar">
-                  <div className="nuke-charge-fill" style={{ width: `${nukeChargePercent}%` }} />
-                </div>
-              )}
-            </button>
-          )}
-          <button className="retro-btn small cancel" onClick={onCancel}>
+          <button
+            className={`nuke-btn ${nukeReady ? 'ready' : ''} ${nukeTargeting !== 'none' ? 'targeting' : ''}`}
+            onClick={handleNukeClick}
+            disabled={!nukeReady || isReplaying || nukeHandlingRef.current}
+          >
+            <span className="nuke-icon">☢</span>
+            <span className="nuke-label">
+              {nukeReady ? 'NUKE' : `${nukeSecondsLeft}s`}
+            </span>
+            {!nukeReady && (
+              <div className="nuke-charge-bar">
+                <div className="nuke-charge-fill" style={{ width: `${nukeChargePercent}%` }} />
+              </div>
+            )}
+          </button>
+          <button className="retro-btn small cancel" onClick={() => setShowQuitConfirm(true)}>
             <X size={14} style={{ verticalAlign: '-2px', marginRight: '3px' }} />
             QUIT
           </button>
         </div>
       </div>
 
-      {/* Opponents sidebar */}
-      {opponentList.length > 0 && (
+      {/* Opponents sidebar — shows live progress; expands to nuke target selector on click */}
+      {(opponentList.length > 0 || nukeTargeting !== 'none') && (
         <div className={`opponents-sidebar ${nukeTargeting === 'selectOpponent' ? 'nuke-select-mode' : ''}`}>
-          {nukeTargeting === 'selectOpponent' && (
-            <div className="nuke-select-header">
-              <Crosshair size={12} />
-              <span>SELECT TARGET</span>
-            </div>
-          )}
-          <h4 className="opponents-title">
-            <Users size={13} style={{ verticalAlign: '-2px', marginRight: '4px' }} />
-            OPPONENTS
-          </h4>
-          {opponentList.map(([id, data]) => (
-            <div
-              key={id}
-              className={`opponent-card ${nukeTargeting === 'selectOpponent' ? 'nuke-targetable' : ''}`}
-              onClick={nukeTargeting === 'selectOpponent' ? () => handleSelectOpponent(id, data.playerName) : undefined}
-            >
-              <div className="opponent-header">
-                <span className="opponent-name">{data.playerName}</span>
-                <span className="opponent-round">R{(data.round || 0) + 1}</span>
+          {nukeTargeting === 'selectOpponent' ? (
+            <>
+              <div className="nuke-select-header">
+                <Crosshair size={12} />
+                <span>SELECT TARGET</span>
               </div>
-              <div className="opponent-progress">
-                <div className="opponent-bar">
+              {nukeTargetsLoading ? (
+                <div className="nuke-targets-loading">
+                  <div className="loading-spinner" />
+                  <span>LOADING...</span>
+                </div>
+              ) : nukeTargets?.length === 0 ? (
+                <div className="nuke-targets-empty">No targets</div>
+              ) : (
+                nukeTargets?.map((target) => (
                   <div
-                    className="opponent-fill"
-                    style={{
-                      width: `${data.totalPieces > 0 ? (data.piecesPlaced / data.totalPieces) * 100 : 0}%`,
-                    }}
-                  />
-                </div>
-                <span className="opponent-count">
-                  {data.piecesPlaced || 0}/{data.totalPieces || '?'}
-                </span>
-              </div>
-              {data.completed && (
-                <span className="opponent-done">✓ {formatTime(data.timeMs)}</span>
+                    key={target.id}
+                    className="opponent-card nuke-targetable"
+                    onClick={() => handleSelectOpponent(target.id, target.name)}
+                  >
+                    <div className="opponent-header">
+                      <span className="opponent-name">{target.name}</span>
+                    </div>
+                    <div className="nuke-target-label">
+                      <Crosshair size={10} />
+                      TARGET
+                    </div>
+                  </div>
+                ))
               )}
-              {nukeTargeting === 'selectOpponent' && (
-                <div className="nuke-target-label">
-                  <Crosshair size={10} />
-                  TARGET
+              <button className="nuke-cancel-btn" onClick={handleCancelTargeting}>
+                CANCEL
+              </button>
+            </>
+          ) : (
+            <>
+              <h4 className="opponents-title">
+                <Users size={13} style={{ verticalAlign: '-2px', marginRight: '4px' }} />
+                OPPONENTS
+              </h4>
+              {opponentList.map(([id, data]) => (
+                <div key={id} className="opponent-card">
+                  <div className="opponent-header">
+                    <span className="opponent-name">{data.playerName}</span>
+                    <span className="opponent-round">R{(data.round || 0) + 1}</span>
+                  </div>
+                  <div className="opponent-progress">
+                    <div className="opponent-bar">
+                      <div
+                        className="opponent-fill"
+                        style={{
+                          width: `${data.totalPieces > 0 ? (data.piecesPlaced / data.totalPieces) * 100 : 0}%`,
+                        }}
+                      />
+                    </div>
+                    <span className="opponent-count">
+                      {data.piecesPlaced || 0}/{data.totalPieces || '?'}
+                    </span>
+                  </div>
+                  {data.completed && (
+                    <span className="opponent-done">✓ {formatTime(data.timeMs)}</span>
+                  )}
                 </div>
+              ))}
+              {nukeTargeting !== 'none' && (
+                <button className="nuke-cancel-btn" onClick={handleCancelTargeting}>
+                  CANCEL
+                </button>
               )}
-            </div>
-          ))}
-          {nukeTargeting !== 'none' && (
-            <button className="nuke-cancel-btn" onClick={handleCancelTargeting}>
-              CANCEL
-            </button>
+            </>
           )}
         </div>
       )}
@@ -505,23 +586,42 @@ export default function Game({
           </div>
         )}
 
-        {/* Nuke result toast */}
-        {nukeResult && (
-          <div className={`nuke-result-toast ${nukeResult.hit ? 'hit' : 'miss'}`}>
-            <span className="nuke-result-icon">{nukeResult.hit ? '💥' : '💨'}</span>
-            <div className="nuke-result-body">
-              <span className="nuke-result-title">
-                {nukeResult.hit ? 'DIRECT HIT!' : 'MISS!'}
-              </span>
-              <span className="nuke-result-detail">
-                {nukeResult.hit
-                  ? `${nukeResult.piecesDestroyed} piece${nukeResult.piecesDestroyed !== 1 ? 's' : ''} destroyed`
-                  : 'No pieces in target zone'}
-              </span>
+      </div>
+
+      {/* Nuke result toast */}
+      {nukeResult && (
+        <div className={`nuke-result-toast ${nukeResult.hit ? 'hit' : 'miss'}`}>
+          <span className="nuke-result-icon">{nukeResult.hit ? '💥' : '💨'}</span>
+          <div className="nuke-result-body">
+            <span className="nuke-result-title">
+              {nukeResult.hit ? 'DIRECT HIT!' : 'MISS!'}
+            </span>
+            <span className="nuke-result-detail">
+              {nukeResult.hit
+                ? `${nukeResult.piecesDestroyed} piece${nukeResult.piecesDestroyed !== 1 ? 's' : ''} destroyed`
+                : 'No pieces in target zone'}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {showQuitConfirm && (
+        <div className="quit-confirm-overlay">
+          <div className="quit-confirm-dialog">
+            <X size={20} className="quit-confirm-icon" />
+            <h3 className="quit-confirm-title">QUIT GAME?</h3>
+            <p className="quit-confirm-body">Your progress will be lost.</p>
+            <div className="quit-confirm-actions">
+              <button className="retro-btn cancel" onClick={() => setShowQuitConfirm(false)}>
+                KEEP PLAYING
+              </button>
+              <button className="retro-btn primary" onClick={onCancel}>
+                QUIT
+              </button>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

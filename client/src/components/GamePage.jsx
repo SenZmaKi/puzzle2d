@@ -54,10 +54,9 @@ export default function GamePage() {
             setCurrentRound(round);
             log.info('Restoring game state', { phase: state.phase, round });
 
-            // Mark as restored so game_started events don't override our state
-            isRestoredRef.current = true;
-
             if (state.phase === 'playing') {
+              // Mark as restored so game_started doesn't reset our mid-game progress
+              isRestoredRef.current = true;
               const savedPiecesStr = localStorage.getItem(`puzzle2d_pieces_${gameId}_r${round}`);
               if (savedPiecesStr) {
                 setSavedPieceState(JSON.parse(savedPiecesStr));
@@ -173,6 +172,15 @@ export default function GamePage() {
     };
   }, [playerInfo, gameData, gameId]);
 
+  // Preload all round images so transitions between rounds are seamless
+  useEffect(() => {
+    if (!gameData?.images?.length) return;
+    gameData.images.forEach((src) => {
+      const img = new Image();
+      img.src = src;
+    });
+  }, [gameData]);
+
   // Auto-save game state to localStorage whenever phase/round/roundTime changes
   useEffect(() => {
     if (!gameId || ['loading', 'error', 'join'].includes(phase)) return;
@@ -187,6 +195,7 @@ export default function GamePage() {
     for (let r = 0; r < rounds; r++) {
       localStorage.removeItem(`puzzle2d_pieces_${gameId}_r${r}`);
       localStorage.removeItem(`puzzle2d_timer_${gameId}_r${r}`);
+      localStorage.removeItem(`puzzle2d_nuke_${gameId}_r${r}`);
     }
   }, [gameId, gameData]);
 
@@ -208,15 +217,15 @@ export default function GamePage() {
       };
       localStorage.setItem(`puzzle2d_player_${gameId}`, JSON.stringify(info));
       setPlayerInfo(info);
-      log.info('Joined successfully', { playerId: data.playerId, totalPlayers: data.players.length });
-      // Normalize API player format to match socket format
+      log.info('Joined successfully', { playerId: data.playerId, totalPlayers: data.players.length, started: data.started });
       setPlayers(
         data.players.map((p) => ({
           playerId: p.id || p.playerId,
           playerName: p.name || p.playerName,
         }))
       );
-      setPhase('lobby');
+      // Skip lobby if host already started the game
+      setPhase(data.started ? 'playing' : 'lobby');
     } catch (err) {
       log.error('Join failed', { error: err.message });
       setError(err.message);

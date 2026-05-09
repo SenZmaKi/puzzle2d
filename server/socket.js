@@ -7,7 +7,7 @@ const log = createLogger('socket');
 // Track active socket connections: socketId -> { playerId, gameId, playerName }
 const activeSockets = new Map();
 // Track games that have been started so late joiners can skip the lobby
-const startedGames = new Set();
+export const startedGames = new Set();
 
 export function setupSocket(io) {
   io.on('connection', (socket) => {

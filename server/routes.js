@@ -7,6 +7,7 @@ import { nanoid } from 'nanoid';
 import { v4 as uuidv4 } from 'uuid';
 import { ROUNDS } from '../shared/constants.js';
 import createLogger from './logger.js';
+import { startedGames } from './socket.js';
 import {
   createGame,
   getGame,
@@ -136,11 +137,13 @@ router.post('/games/:id/join', (req, res) => {
 
   const players = getGamePlayers.all(game.id);
 
-  log.info('Player joined', { gameId: game.id, playerId, playerName: playerName.trim(), totalPlayers: players.length });
+  const started = startedGames.has(game.id);
+  log.info('Player joined', { gameId: game.id, playerId, playerName: playerName.trim(), totalPlayers: players.length, started });
   res.json({
     playerId,
     playerName: playerName.trim(),
     players: players.map((p) => ({ id: p.id, name: p.name, isCreator: !!p.is_creator })),
+    started,
   });
 });
 

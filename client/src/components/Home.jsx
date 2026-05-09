@@ -244,8 +244,8 @@ export default function Home() {
           <Users size={13} style={{ verticalAlign: '-2px', marginRight: '4px' }} />
           Share the link • Friends join • Race to solve!
         </p>
-        <Link to="/browse" className="browse-link">
-          <Search size={13} style={{ verticalAlign: '-2px', marginRight: '4px' }} />
+        <Link to="/browse" className="retro-btn" style={{ textDecoration: 'none', marginTop: '0.75rem' }}>
+          <Search size={14} style={{ verticalAlign: '-2px', marginRight: '6px' }} />
           BROWSE EXISTING GAMES
         </Link>
       </div>
