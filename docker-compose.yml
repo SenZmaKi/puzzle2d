@@ -3,6 +3,7 @@ version: "3.8"
 services:
   puzzle2d:
     image: ghcr.io/senzmaki/puzzle2d:latest
+    pull_policy: always
     ports:
       - "3000:3000"
     volumes:
