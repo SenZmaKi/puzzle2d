@@ -3,7 +3,7 @@ let currentAudio = null;
 let trackList = null;
 let isPlaying = false;
 let isMuted = (() => { try { return localStorage.getItem('puzzle2d_music_muted') === 'true'; } catch { return false; } })();
-let volume = (() => { try { const v = localStorage.getItem('puzzle2d_music_vol'); return v !== null ? parseFloat(v) : 0.05; } catch { return 0.05; } })();
+let volume = (() => { try { const v = localStorage.getItem('puzzle2d_music_vol'); return v !== null ? parseFloat(v) : 0.5; } catch { return 0.5; } })();
 const BASE_BGM_VOLUME = 0.1;
 
 async function fetchTrackList() {
