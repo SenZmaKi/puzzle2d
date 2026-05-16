@@ -3,7 +3,8 @@ import { playButtonSound } from '../utils/sounds';
 import { Home, Trophy, Timer, Star } from 'lucide-react';
 
 function computeScore(timeMs, pieces) {
-  if (timeMs <= 0) return 100;
+  if (timeMs < 0) return 0;
+  if (timeMs === 0) return 100;
   const decayMs = pieces * 7500;
   return Math.max(1, Math.round(100 * Math.exp(-timeMs / decayMs)));
 }
@@ -31,7 +32,7 @@ export default function GameComplete({ gameId, playerInfo, gameData, onHome }) {
             playerScores[entry.player_name] = { name: entry.player_name, totalScore: 0, totalTime: 0, roundsCompleted: 0 };
           }
           playerScores[entry.player_name].totalScore += score;
-          playerScores[entry.player_name].totalTime += entry.time_ms;
+          playerScores[entry.player_name].totalTime += Math.max(0, entry.time_ms);
           playerScores[entry.player_name].roundsCompleted++;
         }
 

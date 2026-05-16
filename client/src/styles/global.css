@@ -403,6 +403,15 @@ body {
   background: linear-gradient(180deg, #2a0a0a, #1a0606);
 }
 
+.retro-btn.skip {
+  border-color: #444;
+}
+
+.retro-btn.skip:hover {
+  border-color: var(--red-light);
+  background: linear-gradient(180deg, #2a0a0a, #1a0606);
+}
+
 .retro-btn:disabled {
   opacity: 0.5;
   pointer-events: none;
@@ -1192,6 +1201,15 @@ body {
   width: 100%;
   max-height: 300px;
   object-fit: contain;
+}
+
+.completed-image.skipped-image {
+  filter: grayscale(0.7) brightness(0.6);
+  opacity: 0.7;
+}
+
+.stat-score.skipped-score {
+  color: var(--text-dim);
 }
 
 .round-stats {

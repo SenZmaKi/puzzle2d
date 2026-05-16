@@ -48,6 +48,7 @@ export default function Game({
   const startTimeRef = useRef(null);
 
   const [showQuitConfirm, setShowQuitConfirm] = useState(false);
+  const [showSkipConfirm, setShowSkipConfirm] = useState(false);
 
   const [nukeCharge, setNukeCharge] = useState(0);
   const [nukeReady, setNukeReady] = useState(false);
@@ -422,6 +423,13 @@ export default function Game({
               </div>
             )}
           </button>
+          <button
+            className="retro-btn small skip"
+            onClick={() => setShowSkipConfirm(true)}
+            disabled={isReplaying || isPreviewMode}
+          >
+            SKIP
+          </button>
           <button className="retro-btn small cancel" onClick={() => setShowQuitConfirm(true)}>
             <X size={14} style={{ verticalAlign: '-2px', marginRight: '3px' }} />
             QUIT
@@ -601,6 +609,30 @@ export default function Game({
                 ? `${nukeResult.piecesDestroyed} piece${nukeResult.piecesDestroyed !== 1 ? 's' : ''} destroyed`
                 : 'No pieces in target zone'}
             </span>
+          </div>
+        </div>
+      )}
+
+      {showSkipConfirm && (
+        <div className="quit-confirm-overlay">
+          <div className="quit-confirm-dialog">
+            <h3 className="quit-confirm-title">SKIP ROUND?</h3>
+            <p className="quit-confirm-body">You will receive a score of <strong>0</strong> for this round.</p>
+            <div className="quit-confirm-actions">
+              <button className="retro-btn cancel" onClick={() => setShowSkipConfirm(false)}>
+                KEEP PLAYING
+              </button>
+              <button
+                className="retro-btn primary"
+                onClick={() => {
+                  if (timerRef.current) clearInterval(timerRef.current);
+                  setShowSkipConfirm(false);
+                  onRoundComplete(-1);
+                }}
+              >
+                SKIP
+              </button>
+            </div>
           </div>
         </div>
       )}
